@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom'; // Se agregó useLocation
 import api from '../../api/axios';
 import { ArrowLeft, Volume2, Bookmark, Share2, Hash, BookOpen } from 'lucide-react';
 
@@ -8,6 +8,7 @@ const BASE_URL = 'http://127.0.0.1:8000';
 export default function DetalleVocabulario() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation(); // Necesario para detectar el estado de navegación
     const [p, setP] = useState(null);
 
     useEffect(() => {
@@ -21,19 +22,6 @@ export default function DetalleVocabulario() {
         cargarDetalle();
     }, [id]);
 
-
-    useEffect(() => {
-        // Verificamos si venimos de una navegación que envió el estado 'diccionario'
-        if (location.state?.seccion === 'diccionario') {
-            setVistaActiva('diccionario');
-
-            // Limpiamos el estado para que si el usuario recarga la página (F5), 
-            // no se quede "pegado" siempre en el diccionario.
-            window.history.replaceState({}, document.title);
-        }
-    }, [location.state]);
-
-
     if (!p) return (
         <div className="flex justify-center items-center h-screen bg-slate-50">
             <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-teal-700"></div>
@@ -41,7 +29,10 @@ export default function DetalleVocabulario() {
     );
 
     // --- LÓGICA DE HERENCIA ---
-    const traduccionConInfo = p.traducciones?.find(t => t.imagen || t.categoria_gramatical_nombre || t.tema_nombre);
+    // Buscamos cualquier traducción que tenga la info que le falta a la palabra principal
+    const traduccionConInfo = p.traducciones?.find(t => 
+        t.imagen || t.categoria_gramatical_nombre || t.tema_nombre || t.ejemplo
+    );
 
     const imagenHeredada = p.imagen || traduccionConInfo?.imagen;
     const fullImgUrl = imagenHeredada
@@ -50,23 +41,31 @@ export default function DetalleVocabulario() {
 
     const gramaticaHeredada = p.categoria_gramatical_nombre || traduccionConInfo?.categoria_gramatical_nombre || 'Sin categoría';
     const temaHeredado = p.tema_nombre || traduccionConInfo?.tema_nombre || 'General';
+    
+    // Herencia del ejemplo
+    const ejemploHeredado = p.ejemplo || traduccionConInfo?.ejemplo;
+
+    const reproducirAudio = () => {
+        if (p.audio) {
+            const urlAudio = p.audio.startsWith('http') ? p.audio : `${BASE_URL}${p.audio}`;
+            const audio = new Audio(urlAudio);
+            audio.play().catch(e => console.error("Error al reproducir audio:", e));
+        } else {
+            alert("Este término no tiene un audio registrado.");
+        }
+    };
 
     return (
         <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-900 flex flex-col">
             {/* Header / Nav */}
             <div className="max-w-6xl mx-auto w-full p-6 flex justify-between items-center">
-                <button onClick={() => navigate('/', { state: { seccion: 'diccionario' } })} className="group flex items-center text-teal-800 font-black text-xs uppercase tracking-[0.2em]">
+                <button 
+                    onClick={() => navigate('/', { state: { seccion: 'diccionario' } })} 
+                    className="group flex items-center text-teal-800 font-black text-xs uppercase tracking-[0.2em]"
+                >
                     <ArrowLeft className="mr-2 group-hover:-translate-x-2 transition-transform" size={18} />
                     Volver al Diccionario
                 </button>
-                <div className="flex gap-4">
-                    <button className="p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all text-slate-400 hover:text-teal-600">
-                        <Bookmark size={20} />
-                    </button>
-                    <button className="p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all text-slate-400 hover:text-teal-600">
-                        <Share2 size={20} />
-                    </button>
-                </div>
             </div>
 
             <div className="max-w-5xl mx-auto px-4 w-full grow">
@@ -74,7 +73,6 @@ export default function DetalleVocabulario() {
 
                     {/* Hero Section */}
                     <div className="relative bg-slate-900 pt-24 pb-32 px-10 md:px-20 overflow-hidden">
-                        {/* Decoración de fondo */}
                         <div className="absolute top-0 right-0 w-1/2 h-full bg-linear-to-l from-teal-500/10 to-transparent"></div>
 
                         <div className="relative z-10">
@@ -92,7 +90,14 @@ export default function DetalleVocabulario() {
                                 <h1 className="text-7xl md:text-9xl font-black text-white tracking-tighter italic leading-none uppercase">
                                     {p.termino}
                                 </h1>
-                                <button className="mb-2 p-4 bg-teal-500/20 hover:bg-teal-500 text-teal-400 hover:text-white rounded-full transition-all backdrop-blur-md">
+                                <button
+                                    onClick={reproducirAudio}
+                                    className={`mb-2 p-4 rounded-full transition-all backdrop-blur-md ${p.audio
+                                            ? "bg-teal-500/20 hover:bg-teal-500 text-teal-400 hover:text-white"
+                                            : "bg-slate-700 text-slate-500 cursor-not-allowed"
+                                        }`}
+                                    title={p.audio ? "Escuchar pronunciación" : "Audio no disponible"}
+                                >
                                     <Volume2 size={32} />
                                 </button>
                             </div>
@@ -110,8 +115,14 @@ export default function DetalleVocabulario() {
                                     <BookOpen size={14} /> Contexto de Uso
                                 </h3>
                                 <p className="text-4xl text-slate-800 font-serif leading-tight italic border-l-8 border-teal-600 pl-10 py-2">
-                                    “{p.ejemplo || 'No hay un ejemplo registrado para este término todavía.'}”
+                                    “{ejemploHeredado || 'No hay un ejemplo registrado para este término todavía.'}”
                                 </p>
+                                {/* Indicador visual de herencia */}
+                                {!p.ejemplo && ejemploHeredado && (
+                                    <span className="text-[9px] font-black text-teal-600 uppercase tracking-widest mt-4 block italic">
+                                        * Ejemplo heredado de la traducción
+                                    </span>
+                                )}
                             </section>
 
                             <section>
@@ -129,7 +140,6 @@ export default function DetalleVocabulario() {
 
                         {/* Columna Derecha: Sidebar */}
                         <div className="md:col-span-5 bg-slate-50/80 p-10 md:p-16 border-l border-slate-100 flex flex-col gap-10">
-                            {/* Imagen con Herencia */}
                             <div className="relative">
                                 {fullImgUrl ? (
                                     <div className="rounded-[3rem] overflow-hidden shadow-2xl border-12 border-white transform rotate-2 hover:rotate-0 transition-transform duration-500">
@@ -147,7 +157,6 @@ export default function DetalleVocabulario() {
                                 )}
                             </div>
 
-                            {/* Info Adicional */}
                             <div className="space-y-6">
                                 <div className="p-8 bg-white rounded-[2.5rem] shadow-sm border border-slate-100">
                                     <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Categoría Gramatical</p>
