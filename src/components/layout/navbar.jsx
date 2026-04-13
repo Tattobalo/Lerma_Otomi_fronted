@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import logo from '../../assets/logo_lerma.png'
+import logo from '../../assets/lerma_home.png'
 
 export default function Navbar() {
   return (

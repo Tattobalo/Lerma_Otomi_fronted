@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';     // <--- AGREGAR useLocation
 import { Languages, ArrowRightLeft } from 'lucide-react';
 import api from '../../api/axios';
 import DiccionarioSeccion from './diccionario';
+import logo from '../../assets/logo_lerma1.png';
 
 export default function LermaHome() {
     const location = useLocation();
@@ -25,25 +26,34 @@ export default function LermaHome() {
     }, [location.state]);
 
     const manejarTraduccion = async () => {
-        if (!textoTraductor.trim()) return;
+        const textoLimpio = textoTraductor.trim(); // Limpieza extra
+        if (!textoLimpio) return;
+
         setCargandoTraduccion(true);
+        setResultadoTraduccion("");
+
         try {
-            const { data } = await api.get(`vocabulario/buscar/?q=${textoTraductor}&dir=${direccion}`);
-            if (data && data.length > 0) {
-                if (direccion === "es_a_ot") {
-                    setResultadoTraduccion(data[0].termino);
+            const { data } = await api.get(`vocabulario/buscar/`, {
+                params: { q: textoLimpio, dir: direccion } // Usar params es más seguro
+            });
+
+            if (Array.isArray(data) && data.length > 0) {
+                // Buscamos la traducción que NO sea igual al término buscado
+                const palabraEncontrada = data[0];
+                const trad = palabraEncontrada.traducciones?.find(t =>
+                    t.termino.toLowerCase() !== textoLimpio.toLowerCase()
+                );
+
+                if (trad) {
+                    setResultadoTraduccion(trad.termino);
                 } else {
-                    // Buscamos en el array 'traducciones' que ahora tiene más info gracias al Serializer
-                    const traduccionEsp = data[0].traducciones?.find(
-                        t => t.idioma_nombre?.toLowerCase() === "español"
-                    );
-                    setResultadoTraduccion(traduccionEsp ? traduccionEsp.termino : "Sin traducción");
+                    setResultadoTraduccion("Sin traducción vinculada");
                 }
             } else {
-                setResultadoTraduccion("No encontrado");
+                setResultadoTraduccion("No se encontro el termino");
             }
         } catch (e) {
-            setResultadoTraduccion("Error");
+            setResultadoTraduccion("Error de conexión");
         } finally {
             setCargandoTraduccion(false);
         }
@@ -51,7 +61,24 @@ export default function LermaHome() {
 
     const intercambiarIdiomas = () => {
         setDireccion(prev => prev === "es_a_ot" ? "ot_a_es" : "es_a_ot");
-        setTextoTraductor(resultadoTraduccion);
+
+        // 2. Lógica inteligente para mover el texto:
+        // Solo movemos el resultado al cuadro de texto si NO es un mensaje de error o aviso
+        const mensajesDeError = [
+            "No se encontro el termino",
+            "Error de conexión",
+            "Sin traducción vinculada",
+            "---"
+        ];
+
+        if (resultadoTraduccion && !mensajesDeError.includes(resultadoTraduccion)) {
+            setTextoTraductor(resultadoTraduccion);
+        } else {
+            // Si había un error o estaba vacío, mejor limpiamos el input para el usuario
+            setTextoTraductor("");
+        }
+
+        // 3. Siempre limpiamos el resultado para que el nuevo cuadro verde empiece vacío
         setResultadoTraduccion("");
     };
 
@@ -61,7 +88,7 @@ export default function LermaHome() {
                 <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
                         <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20">
-                            <Languages className="w-8 h-8 text-orange-200" />
+                            <img src={logo} alt="Lerma-otomi-png" className="w-full h-full object-contain" />
                         </div>
                         <div>
                             <h1 className="text-3xl font-black tracking-tight italic">Lerma Otomí</h1>
@@ -89,44 +116,42 @@ export default function LermaHome() {
             <main className="max-w-6xl mx-auto px-4 py-12 grow w-full">
                 {vistaActiva === "traductor" ? (
                     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className="bg-white rounded-[3rem] shadow-2xl p-10 border border-slate-100 relative">
+                        <div className="traductor-card">
                             <div className="grid md:grid-cols-2 gap-8 items-center relative">
-                                <div className="space-y-4 text-center">
-                                    <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
+
+                                {/* ENTRADA */}
+                                <div className="text-center">
+                                    <label className="traductor-label text-blue-500">
                                         {direccion === "es_a_ot" ? "Español" : "Otomí"}
                                     </label>
                                     <textarea
                                         value={textoTraductor}
                                         onChange={(e) => setTextoTraductor(e.target.value)}
                                         placeholder="Escribe aquí..."
-                                        className="w-full h-40 p-8 bg-slate-50 rounded-[2.5rem] text-xl italic outline-none resize-none focus:ring-2 focus:ring-red-100 transition-all"
+                                        className="traductor-input"
                                     />
                                 </div>
 
-                                <button
-                                    onClick={intercambiarIdiomas}
-                                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 bg-white p-3 rounded-full shadow-xl text-red-600 hover:rotate-180 transition-all border border-slate-100"
-                                >
+                                <button onClick={intercambiarIdiomas} className="btn-swap">
                                     <ArrowRightLeft size={24} />
                                 </button>
 
-                                <div className="space-y-4 text-center">
-                                    <label className="text-[10px] font-black text-teal-500 uppercase tracking-widest">
+                                {/* SALIDA */}
+                                <div className="text-center">
+                                    <label className="traductor-label text-teal-500">
                                         {direccion === "es_a_ot" ? "Otomí" : "Español"}
                                     </label>
-                                    <div className="w-full h-40 p-8 bg-linear-to-br from-teal-500 to-emerald-600 rounded-[2.5rem] text-white flex items-center justify-center text-3xl font-black italic shadow-inner">
+                                    <div className="traductor-output">
                                         {cargandoTraduccion ? (
-                                            <div className="animate-pulse">...</div>
+                                            <div className="animate-pulse text-lg">Traduciendo...</div>
                                         ) : (
                                             resultadoTraduccion || "---"
                                         )}
                                     </div>
                                 </div>
                             </div>
-                            <button
-                                onClick={manejarTraduccion}
-                                className="w-full mt-10 py-5 bg-linear-to-r from-red-700 to-orange-600 text-white rounded-2xl font-black shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
-                            >
+
+                            <button onClick={manejarTraduccion} className="btn-traductor">
                                 TRADUCIR TÉRMINO
                             </button>
                         </div>

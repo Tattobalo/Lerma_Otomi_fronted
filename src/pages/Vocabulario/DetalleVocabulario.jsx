@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom'; // Se agregó useLocation
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
-import { ArrowLeft, Volume2, Bookmark, Share2, Hash, BookOpen } from 'lucide-react';
+import { ArrowLeft, Volume2, Hash, BookOpen } from 'lucide-react';
 
-const BASE_URL = 'http://127.0.0.1:8000';
+//const BASE_URL = 'http://127.0.0.1:8000'; 
+const BASE_URL = 'https://g6q4l19k-8000.use.devtunnels.ms';
 
 export default function DetalleVocabulario() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const location = useLocation(); // Necesario para detectar el estado de navegación
     const [p, setP] = useState(null);
 
     useEffect(() => {
@@ -16,8 +16,7 @@ export default function DetalleVocabulario() {
             try {
                 const { data } = await api.get(`vocabulario/${id}/`);
                 setP(data);
-                console.log("DATOS RECIBIDOS:", data);
-            } catch (error) { console.error("Error al obtener datos:", error); }
+            } catch (error) { console.error("Error:", error); }
         };
         cargarDetalle();
     }, [id]);
@@ -28,39 +27,51 @@ export default function DetalleVocabulario() {
         </div>
     );
 
-    // --- LÓGICA DE HERENCIA ---
-    // Buscamos cualquier traducción que tenga la info que le falta a la palabra principal
-    const traduccionConInfo = p.traducciones?.find(t => 
-        t.imagen || t.categoria_gramatical_nombre || t.tema_nombre || t.ejemplo
-    );
+    // --- LÓGICA DE HERENCIA Y RECURSOS ---
+    const traduccionConInfo = p.traducciones?.find(t => t.imagen || t.categoria_gramatical_nombre || t.tema_nombre || t.ejemplo);
 
-    const imagenHeredada = p.imagen || traduccionConInfo?.imagen;
-    const fullImgUrl = imagenHeredada
-        ? (imagenHeredada.startsWith('http') ? imagenHeredada : `${BASE_URL}${imagenHeredada}`)
-        : null;
+    // Función para limpiar URLs de medios
+    const getMediaUrl = (url) => {
+        if (!url) return null;
 
+        // 1. Si la URL ya es completa (empieza con http)
+        if (url.startsWith('http')) {
+            // REVISIÓN CRÍTICA: Si la URL trae 'localhost' o '127.0.0.1', 
+            // la "limpiamos" para que use nuestro túnel.
+            if (url.includes('localhost') || url.includes('127.0.0.1')) {
+                // Extraemos solo la parte después del puerto 8000
+                // Ejemplo: http://localhost:8000/media/foto.jpg -> /media/foto.jpg
+                const pathSplitted = url.split(':8000');
+                const path = pathSplitted.length > 1 ? pathSplitted[1] : url;
+                return `${BASE_URL}${path}`;
+            }
+            return url; // Si es una URL externa real, la dejamos pasar
+        }
+
+        // 2. Si es una ruta relativa (/media/...) la concatenamos normal
+        const cleanPath = url.startsWith('/') ? url : `/${url}`;
+        return `${BASE_URL}${cleanPath}`;
+    };
+
+    const fullImgUrl = getMediaUrl(p.imagen || traduccionConInfo?.imagen);
     const gramaticaHeredada = p.categoria_gramatical_nombre || traduccionConInfo?.categoria_gramatical_nombre || 'Sin categoría';
     const temaHeredado = p.tema_nombre || traduccionConInfo?.tema_nombre || 'General';
-    
-    // Herencia del ejemplo
     const ejemploHeredado = p.ejemplo || traduccionConInfo?.ejemplo;
 
     const reproducirAudio = () => {
-        if (p.audio) {
-            const urlAudio = p.audio.startsWith('http') ? p.audio : `${BASE_URL}${p.audio}`;
-            const audio = new Audio(urlAudio);
-            audio.play().catch(e => console.error("Error al reproducir audio:", e));
+        const urlAudio = getMediaUrl(p.audio);
+        if (urlAudio) {
+            new Audio(urlAudio).play().catch(e => console.error("Error audio:", e));
         } else {
             alert("Este término no tiene un audio registrado.");
         }
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-900 flex flex-col">
-            {/* Header / Nav */}
-            <div className="max-w-6xl mx-auto w-full p-6 flex justify-between items-center">
-                <button 
-                    onClick={() => navigate('/', { state: { seccion: 'diccionario' } })} 
+        <div className="min-h-screen bg-slate-50 pb-20 flex flex-col">
+            <div className="max-w-6xl mx-auto w-full p-6">
+                <button
+                    onClick={() => navigate('/', { state: { seccion: 'diccionario' } })}
                     className="group flex items-center text-teal-800 font-black text-xs uppercase tracking-[0.2em]"
                 >
                     <ArrowLeft className="mr-2 group-hover:-translate-x-2 transition-transform" size={18} />
@@ -69,17 +80,13 @@ export default function DetalleVocabulario() {
             </div>
 
             <div className="max-w-5xl mx-auto px-4 w-full grow">
-                <div className="bg-white rounded-[4rem] shadow-2xl overflow-hidden border border-slate-100">
-
-                    {/* Hero Section */}
-                    <div className="relative bg-slate-900 pt-24 pb-32 px-10 md:px-20 overflow-hidden">
+                <div className="detalle-card">
+                    {/* Hero */}
+                    <div className="hero-section">
                         <div className="absolute top-0 right-0 w-1/2 h-full bg-linear-to-l from-teal-500/10 to-transparent"></div>
-
                         <div className="relative z-10">
                             <div className="flex items-center gap-3 mb-6">
-                                <span className="px-4 py-1 bg-teal-600 rounded-full text-[10px] font-black text-white uppercase tracking-widest">
-                                    {p.idioma_nombre}
-                                </span>
+                                <span className="tag-pill bg-teal-600 text-white">{p.idioma_nombre}</span>
                                 <span className="text-slate-500 font-bold">/</span>
                                 <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                                     <Hash size={12} /> {temaHeredado}
@@ -93,10 +100,9 @@ export default function DetalleVocabulario() {
                                 <button
                                     onClick={reproducirAudio}
                                     className={`mb-2 p-4 rounded-full transition-all backdrop-blur-md ${p.audio
-                                            ? "bg-teal-500/20 hover:bg-teal-500 text-teal-400 hover:text-white"
-                                            : "bg-slate-700 text-slate-500 cursor-not-allowed"
+                                        ? "bg-teal-500/20 hover:bg-teal-500 text-teal-400 hover:text-white"
+                                        : "bg-slate-700 text-slate-500 cursor-not-allowed"
                                         }`}
-                                    title={p.audio ? "Escuchar pronunciación" : "Audio no disponible"}
                                 >
                                     <Volume2 size={32} />
                                 </button>
@@ -107,66 +113,48 @@ export default function DetalleVocabulario() {
                         </div>
                     </div>
 
-                    <div className="grid md:grid-cols-12 gap-0">
-                        {/* Columna Izquierda: Contenido */}
+                    <div className="grid md:grid-cols-12">
+                        {/* Contenido */}
                         <div className="md:col-span-7 p-10 md:p-20 space-y-16">
                             <section>
-                                <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-8 flex items-center gap-2">
-                                    <BookOpen size={14} /> Contexto de Uso
-                                </h3>
+                                <h3 className="section-label"><BookOpen size={14} /> Contexto de Uso</h3>
                                 <p className="text-4xl text-slate-800 font-serif leading-tight italic border-l-8 border-teal-600 pl-10 py-2">
-                                    “{ejemploHeredado || 'No hay un ejemplo registrado para este término todavía.'}”
+                                    “{ejemploHeredado || 'No hay un ejemplo registrado.'}”
                                 </p>
-                                {/* Indicador visual de herencia */}
-                                {!p.ejemplo && ejemploHeredado && (
-                                    <span className="text-[9px] font-black text-teal-600 uppercase tracking-widest mt-4 block italic">
-                                        * Ejemplo heredado de la traducción
-                                    </span>
-                                )}
                             </section>
 
                             <section>
-                                <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-8">Equivalencias</h3>
+                                <h3 className="section-label">Equivalencias</h3>
                                 <div className="space-y-4">
                                     {p.traducciones?.map((t, i) => (
                                         <div key={i} className="flex items-center justify-between p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 group hover:bg-teal-50 transition-colors">
-                                            <span className="text-4xl font-black text-slate-900 uppercase group-hover:text-teal-700 transition-colors">{t.termino}</span>
-                                            <span className="px-4 py-1 bg-white text-slate-400 rounded-lg text-[10px] font-black uppercase shadow-sm">{t.idioma_nombre}</span>
+                                            <span className="text-4xl font-black text-slate-900 uppercase group-hover:text-teal-700">{t.termino}</span>
+                                            <span className="tag-pill bg-white text-slate-400 shadow-sm">{t.idioma_nombre}</span>
                                         </div>
                                     ))}
                                 </div>
                             </section>
                         </div>
 
-                        {/* Columna Derecha: Sidebar */}
-                        <div className="md:col-span-5 bg-slate-50/80 p-10 md:p-16 border-l border-slate-100 flex flex-col gap-10">
-                            <div className="relative">
-                                {fullImgUrl ? (
-                                    <div className="rounded-[3rem] overflow-hidden shadow-2xl border-12 border-white transform rotate-2 hover:rotate-0 transition-transform duration-500">
-                                        <img src={fullImgUrl} alt={p.termino} className="w-full h-80 object-cover" />
-                                        {!p.imagen && (
-                                            <div className="absolute bottom-4 left-4 bg-teal-600 text-white text-[8px] px-3 py-1 rounded-full font-black tracking-tighter shadow-lg">
-                                                IMAGEN DE REFERENCIA
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="h-80 rounded-[3rem] bg-slate-200 flex flex-col items-center justify-center text-slate-400 border-4 border-dashed border-slate-300">
-                                        <span className="font-black text-[10px] uppercase tracking-widest">Sin imagen</span>
-                                    </div>
-                                )}
-                            </div>
+                        {/* Sidebar */}
+                        <div className="md:col-span-5 bg-slate-50/80 p-10 md:p-16 border-l border-slate-100 space-y-10">
+                            {fullImgUrl ? (
+                                <div className="polaroid-frame">
+                                    <img src={fullImgUrl} alt={p.termino} className="w-full h-80 object-cover" />
+                                </div>
+                            ) : (
+                                <div className="h-80 rounded-[3rem] bg-slate-200 flex items-center justify-center text-slate-400 border-4 border-dashed border-slate-300 font-black text-[10px] uppercase tracking-widest">
+                                    Sin imagen
+                                </div>
+                            )}
 
                             <div className="space-y-6">
-                                <div className="p-8 bg-white rounded-[2.5rem] shadow-sm border border-slate-100">
-                                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Categoría Gramatical</p>
-                                    <p className="text-2xl font-black text-teal-700 uppercase italic tracking-tighter">
-                                        {gramaticaHeredada}
-                                    </p>
+                                <div className="info-tile">
+                                    <p className="section-label mb-4 opacity-50">Categoría Gramatical</p>
+                                    <p className="text-2xl font-black text-teal-700 uppercase italic tracking-tighter">{gramaticaHeredada}</p>
                                 </div>
-
-                                <div className="p-8 bg-white rounded-[2.5rem] shadow-sm border border-slate-100">
-                                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">ID de Registro</p>
+                                <div className="info-tile">
+                                    <p className="section-label mb-4 opacity-50">ID de Registro</p>
                                     <p className="text-xl font-bold text-slate-400">#00{p.id}</p>
                                 </div>
                             </div>
