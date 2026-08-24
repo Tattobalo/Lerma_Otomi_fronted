@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { ArrowLeft, Volume2, Hash, BookOpen } from 'lucide-react';
+import AudioPlayer from '../../components/common/AudioPlayer';
 
-//const BASE_URL = 'http://127.0.0.1:8000'; 
-const BASE_URL = 'https://g6q4l19k-8000.use.devtunnels.ms';
+const BASE_URL = import.meta.env.VITE_MEDIA_URL;
 
 export default function DetalleVocabulario() {
     const { id } = useParams();
@@ -48,15 +48,6 @@ export default function DetalleVocabulario() {
     const temaHeredado = p.tema_nombre || traduccionConInfo?.tema_nombre || 'General';
     const ejemploHeredado = p.ejemplo || traduccionConInfo?.ejemplo;
 
-    const reproducirAudio = () => {
-        const urlAudio = getMediaUrl(p.audio);
-        if (urlAudio) {
-            new Audio(urlAudio).play().catch(e => console.error("Error audio:", e));
-        } else {
-            alert("Este término no tiene un audio registrado.");
-        }
-    };
-
     return (
         <div className="min-h-screen bg-slate-50 pb-20 flex flex-col">
             <div className="max-w-6xl mx-auto w-full p-6">
@@ -87,15 +78,9 @@ export default function DetalleVocabulario() {
                                 <h1 className="text-7xl md:text-9xl font-black text-white tracking-tighter italic leading-none uppercase">
                                     {p.termino}
                                 </h1>
-                                <button
-                                    onClick={reproducirAudio}
-                                    className={`mb-2 p-4 rounded-full transition-all backdrop-blur-md ${p.audio
-                                        ? "bg-teal-500/20 hover:bg-teal-500 text-teal-400 hover:text-white"
-                                        : "bg-slate-700 text-slate-500 cursor-not-allowed"
-                                        }`}
-                                >
-                                    <Volume2 size={32} />
-                                </button>
+                            </div>
+                            <div className="mt-8 max-w-md">
+                                <AudioPlayer src={getMediaUrl(p.audio)} />
                             </div>
                             <p className="mt-6 text-3xl text-teal-500 font-serif italic tracking-widest">
                                 / {p.fonetica || p.termino} /
