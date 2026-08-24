@@ -34,21 +34,11 @@ export default function DetalleVocabulario() {
     const getMediaUrl = (url) => {
         if (!url) return null;
 
-        // 1. Si la URL ya es completa (empieza con http)
         if (url.startsWith('http')) {
-            // REVISIÓN CRÍTICA: Si la URL trae 'localhost' o '127.0.0.1', 
-            // la "limpiamos" para que use nuestro túnel.
-            if (url.includes('localhost') || url.includes('127.0.0.1')) {
-                // Extraemos solo la parte después del puerto 8000
-                // Ejemplo: http://localhost:8000/media/foto.jpg -> /media/foto.jpg
-                const pathSplitted = url.split(':8000');
-                const path = pathSplitted.length > 1 ? pathSplitted[1] : url;
-                return `${BASE_URL}${path}`;
-            }
-            return url; // Si es una URL externa real, la dejamos pasar
+            return url;
         }
 
-        // 2. Si es una ruta relativa (/media/...) la concatenamos normal
+        // Si es una ruta relativa por alguna razón, le pegas el BASE_URL (que debe ser http://localhost:8000)
         const cleanPath = url.startsWith('/') ? url : `/${url}`;
         return `${BASE_URL}${cleanPath}`;
     };
